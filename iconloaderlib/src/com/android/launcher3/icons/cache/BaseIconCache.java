@@ -662,8 +662,9 @@ public abstract class BaseIconCache {
             @NonNull final ComponentKey cacheKey, @NonNull final CacheEntry entry,
             @NonNull final Cursor c, final boolean lowRes) {
         // Set the alpha to be 255, so that we never have a wrong color
-        entry.bitmap = ATLEAST_T ? BitmapInfo.of(LOW_RES_ICON,
-                setColorAlphaBound(c.getInt(IconDB.INDEX_COLOR), 255)) : BitmapInfo.of(LOW_RES_ICON, setColorAlphaBound(c.getInt(0), 255));
+        // Evergreen: column 0 is the component name, not the color; use INDEX_COLOR on every API.
+        entry.bitmap = BitmapInfo.of(LOW_RES_ICON,
+                setColorAlphaBound(c.getInt(IconDB.INDEX_COLOR), 255));
         entry.title = c.getString(IconDB.INDEX_TITLE);
         if (entry.title == null) {
             entry.title = "";
@@ -678,8 +679,15 @@ public abstract class BaseIconCache {
                 return false;
             }
             try {
-                entry.bitmap = BitmapInfo.fromByteArray(
-                    c.getBlob(2), entry.bitmap.color, cacheKey.user, this, mContext);
+                // Evergreen: decode the blob we already read from INDEX_ICON. Column 2 is
+                // icon_color (INTEGER), so getBlob(2) threw and every DB hit fell back to
+                // re-rendering the icon.
+                BitmapInfo info = BitmapInfo.fromByteArray(
+                        data, entry.bitmap.color, cacheKey.user, this, mContext);
+                if (info == null) {
+                    return false;
+                }
+                entry.bitmap = info;
             } catch (Exception e) {
                 return false;
             }
