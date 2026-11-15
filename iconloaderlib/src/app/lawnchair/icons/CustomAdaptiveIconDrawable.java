@@ -328,9 +328,11 @@ public class CustomAdaptiveIconDrawable extends AdaptiveIconDrawable implements 
         mMaskMatrix.postTranslate(b.left, b.top);
         sMask.transform(mMaskMatrix, mMask);
 
-        if (mLayersBitmap == null || mLayersBitmap.getWidth() != b.width()
-                || mLayersBitmap.getHeight() != b.height()) {
-            mLayersBitmap = Bitmap.createBitmap(b.width(), b.height(), Bitmap.Config.ARGB_8888);
+        // Evergreen: the layers bitmap is allocated in draw(). Many users only need the mask
+        // (themed icons, the icon factory's wrapper, drag views) and never draw this drawable.
+        if (mLayersBitmap != null && (mLayersBitmap.getWidth() != b.width()
+                || mLayersBitmap.getHeight() != b.height())) {
+            mLayersBitmap = null;
         }
 
         mPaint.setShader(null);
@@ -340,8 +342,13 @@ public class CustomAdaptiveIconDrawable extends AdaptiveIconDrawable implements 
 
     @Override
     public void draw(Canvas canvas) {
-        if (mLayersBitmap == null) {
+        Rect b = getBounds();
+        if (b.isEmpty()) {
             return;
+        }
+        if (mLayersBitmap == null) {
+            mLayersBitmap = Bitmap.createBitmap(b.width(), b.height(), Bitmap.Config.ARGB_8888);
+            mLayersShader = null;
         }
         if (mLayersShader == null) {
             mCanvas.setBitmap(mLayersBitmap);

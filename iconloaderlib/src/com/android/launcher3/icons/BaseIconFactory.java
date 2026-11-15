@@ -71,6 +71,8 @@ public class BaseIconFactory implements AutoCloseable {
 
     private Bitmap mUserBadgeBitmap;
 
+    private UserHandle mUserBadgeBitmapUser;
+
     @Retention(SOURCE)
     @IntDef({MODE_DEFAULT, MODE_ALPHA, MODE_WITH_SHADOW, MODE_HARDWARE_WITH_SHADOW, MODE_HARDWARE})
     @interface BitmapGenerationMode {
@@ -157,19 +159,30 @@ public class BaseIconFactory implements AutoCloseable {
         return mNormalizer;
     }
 
+    /**
+     * Returns the user badge for {@code user}, or null when the user has no badge.
+     *
+     * Evergreen: for a user without a badge (the main user) PackageManager returns the input
+     * drawable, so this used to return a blank icon-sized bitmap that themed icons then drew on
+     * every frame. The cached value was also shared by every user that asked for it.
+     */
+    @Nullable
     public Bitmap getUserBadgeBitmap(UserHandle user) {
-        if (mUserBadgeBitmap == null) {
+        if (mUserBadgeBitmapUser == null || !mUserBadgeBitmapUser.equals(user)) {
             Bitmap bitmap = Bitmap.createBitmap(
                     mIconBitmapSize, mIconBitmapSize, Bitmap.Config.ARGB_8888);
-            Drawable badgedDrawable = mPm.getUserBadgedIcon(
-                    new FixedSizeBitmapDrawable(bitmap), user);
-            if (badgedDrawable instanceof BitmapDrawable) {
+            FixedSizeBitmapDrawable input = new FixedSizeBitmapDrawable(bitmap);
+            Drawable badgedDrawable = mPm.getUserBadgedIcon(input, user);
+            if (badgedDrawable == input) {
+                mUserBadgeBitmap = null;
+            } else if (badgedDrawable instanceof BitmapDrawable) {
                 mUserBadgeBitmap = ((BitmapDrawable) badgedDrawable).getBitmap();
             } else {
                 badgedDrawable.setBounds(0, 0, mIconBitmapSize, mIconBitmapSize);
                 mUserBadgeBitmap = BitmapRenderer.createSoftwareBitmap(
                         mIconBitmapSize, mIconBitmapSize, badgedDrawable::draw);
             }
+            mUserBadgeBitmapUser = user;
         }
         return mUserBadgeBitmap;
     }
