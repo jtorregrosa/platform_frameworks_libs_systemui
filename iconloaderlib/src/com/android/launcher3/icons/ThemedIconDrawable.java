@@ -30,6 +30,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
@@ -70,9 +71,6 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
     final ThemedBitmapInfo bitmapInfo;
     final int colorFg, colorBg;
 
-    // The foreground/monochrome icon for the app
-    private final Drawable mMonochromeIcon;
-    private final AdaptiveIconDrawable mBgWrapper;
     private final Rect mBadgeBounds;
 
     protected ThemedIconDrawable(ThemedConstantState constantState) {
@@ -81,43 +79,22 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
         colorBg = constantState.colorBg;
         colorFg = constantState.colorFg;
 
-        mMonochromeIcon = bitmapInfo.mThemeData.loadMonochromeDrawable(colorFg);
-        mBgWrapper = new CustomAdaptiveIconDrawable(new ColorDrawable(colorBg), null);
         mBadgeBounds = bitmapInfo.mUserBadge == null ? null :
             new Rect(0, 0, bitmapInfo.mUserBadge.getWidth(), bitmapInfo.mUserBadge.getHeight());
-
-    }
-
-    @Override
-    protected void onBoundsChange(Rect bounds) {
-        super.onBoundsChange(bounds);
-        mBgWrapper.setBounds(bounds);
-        mMonochromeIcon.setBounds(bounds);
-    }
-
-    @Override
-    public void setAlpha(int alpha) {
-        super.setAlpha(alpha);
-        mMonochromeIcon.setAlpha(alpha);
     }
 
     @Override
     protected void drawInternal(Canvas canvas, Rect bounds) {
-        // Evergreen: apply the drawable alpha. setColor() replaced the paint alpha set by
-        // setAlpha(), and the monochrome layer never got it, so themed icons ignored fades.
-        int alpha = getAlpha();
-        int count = canvas.save();
-        canvas.scale(bitmapInfo.mNormalizationScale, bitmapInfo.mNormalizationScale,
-            bounds.exactCenterX(), bounds.exactCenterY());
-        mPaint.setColor(colorBg);
-        if (alpha < 255) {
-            mPaint.setAlpha(Color.alpha(colorBg) * alpha / 255);
+        // Evergreen (SUI-7): draw one cached bitmap instead of a path, a vector and the badge on
+        // every frame. The raster lives on the ThemedBitmapInfo, which survives rebinds (the
+        // drawer creates a new drawable on every bind), and is keyed by size and colours.
+        // The paint carries the drawable alpha and the disabled filter (SUI-B2).
+        Bitmap raster = bitmapInfo.getRaster(bounds.width(), bounds.height(), colorBg, colorFg);
+        mPaint.setAlpha(getAlpha());
+        if (raster != null) {
+            canvas.drawBitmap(raster, bounds.left, bounds.top, mPaint);
         }
-        canvas.drawPath(mBgWrapper.getIconMask(), mPaint);
-        mMonochromeIcon.draw(canvas);
-        canvas.restoreToCount(count);
         if (mBadgeBounds != null) {
-            mPaint.setAlpha(alpha);
             canvas.drawBitmap(bitmapInfo.mUserBadge, mBadgeBounds, getBounds(), mPaint);
         }
     }
@@ -157,6 +134,55 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
         final ThemeData mThemeData;
         final float mNormalizationScale;
         final Bitmap mUserBadge;
+
+        // Evergreen (SUI-7): background and monochrome layer rasterized per size and colours.
+        // Two slots: a folder item is drawn both in the folder preview and in the open folder.
+        private final Raster[] mRasters = new Raster[2];
+        private int mNextRaster;
+
+        private static final class Raster {
+            final Bitmap bitmap;
+            final int colorBg, colorFg;
+
+            Raster(Bitmap bitmap, int colorBg, int colorFg) {
+                this.bitmap = bitmap;
+                this.colorBg = colorBg;
+                this.colorFg = colorFg;
+            }
+
+            boolean matches(int width, int height, int bg, int fg) {
+                return bitmap.getWidth() == width && bitmap.getHeight() == height
+                        && colorBg == bg && colorFg == fg;
+            }
+        }
+
+        @Nullable
+        Bitmap getRaster(int width, int height, int colorBg, int colorFg) {
+            if (width <= 0 || height <= 0) {
+                return null;
+            }
+            for (Raster r : mRasters) {
+                if (r != null && r.matches(width, height, colorBg, colorFg)) {
+                    return r.bitmap;
+                }
+            }
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            canvas.scale(mNormalizationScale, mNormalizationScale, width / 2f, height / 2f);
+            AdaptiveIconDrawable bgWrapper =
+                    new CustomAdaptiveIconDrawable(new ColorDrawable(colorBg), null);
+            bgWrapper.setBounds(0, 0, width, height);
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            paint.setColor(colorBg);
+            canvas.drawPath(bgWrapper.getIconMask(), paint);
+            Drawable mono = mThemeData.loadMonochromeDrawable(colorFg);
+            mono.setBounds(0, 0, width, height);
+            mono.draw(canvas);
+            canvas.setBitmap(null);
+            mRasters[mNextRaster] = new Raster(bitmap, colorBg, colorFg);
+            mNextRaster = (mNextRaster + 1) % mRasters.length;
+            return bitmap;
+        }
 
         public ThemedBitmapInfo(Bitmap icon, int color, ThemeData themeData,
                                 float normalizationScale, Bitmap userBadge) {
