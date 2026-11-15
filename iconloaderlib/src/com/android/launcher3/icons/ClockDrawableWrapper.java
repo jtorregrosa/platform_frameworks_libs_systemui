@@ -642,8 +642,10 @@ public class ClockDrawableWrapper extends CustomAdaptiveIconDrawable implements 
             }
             unscheduleSelf(this);
             final long upTime = SystemClock.uptimeMillis();
-            final long step = TICK_MS; /* tick every 200 ms */
-            scheduleSelf(this, upTime - ((upTime % step)) + step);
+            final long step = TICK_MS;
+            // Evergreen: align to the wall-clock tick. Uptime has an arbitrary phase, so the
+            // minute hand could lag the real minute by up to a whole step (one minute).
+            scheduleSelf(this, upTime + step - (System.currentTimeMillis() % step));
         }
 
         @Override
