@@ -156,8 +156,9 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
             }
         }
 
+        // Synchronized: rasters can be built ahead of time on a background thread (SUI-7b).
         @Nullable
-        Bitmap getRaster(int width, int height, int colorBg, int colorFg) {
+        synchronized Bitmap getRaster(int width, int height, int colorBg, int colorFg) {
             if (width <= 0 || height <= 0) {
                 return null;
             }
@@ -382,6 +383,17 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
             float inset = extraInsetFraction / (1 + 2 * extraInsetFraction);
             Drawable fg = new InsetDrawable(mThemeData.loadMonochromeDrawable(colors[1]), inset);
             return new CustomAdaptiveIconDrawable(bg, fg);
+        }
+    }
+
+    /**
+     * Evergreen (SUI-7b): builds the raster that a themed icon of {@code size} pixels drawn with
+     * {@code colors} (from {@link #getThemedColors}) will use, so the first draw does not build it
+     * on the UI thread. Does nothing for icons that are not themed. Safe to call off the UI thread.
+     */
+    public static void prewarmRaster(BitmapInfo info, int size, int[] colors) {
+        if (info instanceof ThemedBitmapInfo) {
+            ((ThemedBitmapInfo) info).getRaster(size, size, colors[0], colors[1]);
         }
     }
 
