@@ -203,15 +203,12 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
                 float normalizationScale = dis.readFloat();
 
                 String packageName = dis.readUTF();
-                Resources res;
-                if (packageName.equals(context.getPackageName())) {
-                    res = context.getResources();
-                } else {
-                    res = context.getPackageManager().getResourcesForApplication(packageName);
-                }
+                // Evergreen: memoized in the icon cache; this ran a binder call and a name lookup
+                // for every themed icon read from the DB.
+                Resources res = iconCache.getThemeResources(context, packageName);
 
                 String resName = dis.readUTF();
-                int resId = res.getIdentifier(resName, "drawable", packageName);
+                int resId = iconCache.getThemeResId(res, packageName, resName);
                 if (resId == ID_NULL) {
                     return null;
                 }

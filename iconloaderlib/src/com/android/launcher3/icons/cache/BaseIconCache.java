@@ -71,6 +71,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 public abstract class BaseIconCache {
@@ -119,6 +120,9 @@ public abstract class BaseIconCache {
 
     @NonNull
     protected String mSystemState = "";
+
+    private final ConcurrentHashMap<String, Resources> mThemeResources = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> mThemeResIds = new ConcurrentHashMap<>();
 
     @Nullable
     private BitmapInfo mDefaultIcon;
@@ -196,6 +200,41 @@ public abstract class BaseIconCache {
         mIconDb.close();
         mIconDb = new IconDB(mContext, mDbFileName, iconPixelSize);
         mCache.clear();
+        clearThemeResources();
+    }
+
+    /**
+     * Evergreen: resources of a themed icon source package, memoized for icons decoded from the
+     * DB. Cleared with the memory cache and whenever the icon parameters or state change.
+     */
+    public Resources getThemeResources(Context context, String packageName)
+            throws NameNotFoundException {
+        if (packageName.equals(context.getPackageName())) {
+            return context.getResources();
+        }
+        Resources res = mThemeResources.get(packageName);
+        if (res == null) {
+            res = context.getPackageManager().getResourcesForApplication(packageName);
+            mThemeResources.put(packageName, res);
+        }
+        return res;
+    }
+
+    /** Evergreen: memoized drawable id of a themed icon, see {@link #getThemeResources}. */
+    @SuppressWarnings("DiscouragedApi")
+    public int getThemeResId(Resources res, String packageName, String resName) {
+        String key = packageName + '/' + resName;
+        Integer id = mThemeResIds.get(key);
+        if (id == null) {
+            id = res.getIdentifier(resName, "drawable", packageName);
+            mThemeResIds.put(key, id);
+        }
+        return id;
+    }
+
+    private void clearThemeResources() {
+        mThemeResources.clear();
+        mThemeResIds.clear();
     }
 
     @Nullable
@@ -520,6 +559,7 @@ public abstract class BaseIconCache {
     public synchronized void clearMemoryCache() {
         assertWorkerThread();
         mCache.clear();
+        clearThemeResources();
     }
 
     /**
