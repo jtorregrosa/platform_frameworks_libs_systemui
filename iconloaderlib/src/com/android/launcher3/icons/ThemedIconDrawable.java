@@ -29,6 +29,7 @@ import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
@@ -95,15 +96,28 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
     }
 
     @Override
+    public void setAlpha(int alpha) {
+        super.setAlpha(alpha);
+        mMonochromeIcon.setAlpha(alpha);
+    }
+
+    @Override
     protected void drawInternal(Canvas canvas, Rect bounds) {
+        // Evergreen: apply the drawable alpha. setColor() replaced the paint alpha set by
+        // setAlpha(), and the monochrome layer never got it, so themed icons ignored fades.
+        int alpha = getAlpha();
         int count = canvas.save();
         canvas.scale(bitmapInfo.mNormalizationScale, bitmapInfo.mNormalizationScale,
             bounds.exactCenterX(), bounds.exactCenterY());
         mPaint.setColor(colorBg);
+        if (alpha < 255) {
+            mPaint.setAlpha(Color.alpha(colorBg) * alpha / 255);
+        }
         canvas.drawPath(mBgWrapper.getIconMask(), mPaint);
         mMonochromeIcon.draw(canvas);
         canvas.restoreToCount(count);
         if (mBadgeBounds != null) {
+            mPaint.setAlpha(alpha);
             canvas.drawBitmap(bitmapInfo.mUserBadge, mBadgeBounds, getBounds(), mPaint);
         }
     }
