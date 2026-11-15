@@ -152,6 +152,15 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
             mUserBadge = userBadge;
         }
 
+        // Evergreen: keep the subclass. BaseIconCache applies withFlags() to every icon read from
+        // the DB, which clones it; the base clone() returned a plain BitmapInfo, so themed icons
+        // loaded from the cache lost their theme and only looked right after a full re-render.
+        @Override
+        public BitmapInfo clone() {
+            return copyInternalsTo(new ThemedBitmapInfo(icon, color, mThemeData,
+                    mNormalizationScale, mUserBadge));
+        }
+
         @Override
         public FastBitmapDrawable newThemedIcon(Context context) {
             int[] colors = getThemedColors(context);
