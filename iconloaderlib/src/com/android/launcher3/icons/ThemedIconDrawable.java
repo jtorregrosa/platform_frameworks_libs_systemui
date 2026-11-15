@@ -166,7 +166,7 @@ public class ThemedIconDrawable extends FastBitmapDrawable {
             int[] colors = getThemedColors(context);
             FastBitmapDrawable drawable = new ThemedConstantState(this, colors[0], colors[1])
                 .newDrawable();
-            drawable.mDisabledAlpha = GraphicsUtils.getFloat(context, R.attr.disabledIconAlpha, 1f);
+            drawable.mDisabledAlpha = GraphicsUtils.getDisabledIconAlpha(context);
             return drawable;
         }
 

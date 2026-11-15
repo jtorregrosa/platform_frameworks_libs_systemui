@@ -37,6 +37,7 @@ import androidx.core.graphics.PathParser;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 
 public class GraphicsUtils {
 
@@ -139,6 +140,29 @@ public class GraphicsUtils {
     /**
      * Returns the alpha corresponding to the theme attribute {@param attr}
      */
+    private static WeakReference<Resources.Theme> sDisabledIconAlphaTheme =
+            new WeakReference<>(null);
+    private static float sDisabledIconAlpha;
+
+    /**
+     * Evergreen: {@code R.attr.disabledIconAlpha} of the context's theme, cached for the last
+     * theme. It was read with obtainStyledAttributes on every icon bind.
+     */
+    public static float getDisabledIconAlpha(Context context) {
+        Resources.Theme theme = context.getTheme();
+        synchronized (GraphicsUtils.class) {
+            if (theme != null && sDisabledIconAlphaTheme.get() == theme) {
+                return sDisabledIconAlpha;
+            }
+        }
+        float value = getFloat(context, R.attr.disabledIconAlpha, 1f);
+        synchronized (GraphicsUtils.class) {
+            sDisabledIconAlphaTheme = new WeakReference<>(theme);
+            sDisabledIconAlpha = value;
+        }
+        return value;
+    }
+
     public static float getFloat(Context context, int attr, float defValue) {
         TypedArray ta = context.obtainStyledAttributes(new int[]{attr});
         float value = ta.getFloat(0, defValue);

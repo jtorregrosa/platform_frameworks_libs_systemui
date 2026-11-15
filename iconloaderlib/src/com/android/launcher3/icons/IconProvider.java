@@ -169,9 +169,13 @@ public class IconProvider {
     }
 
     protected ThemedIconDrawable.ThemeData getDynamicIconsFromMap(Context context, Map<ComponentName, ThemedIconDrawable.ThemeData> themeMap, ComponentName componentName) {
-        if (dynamicCalendars.stream().anyMatch(s -> s.getPackageName().equalsIgnoreCase(componentName.getPackageName()))) {
-            final int resId = getDynamicCalendarResource(context);
-            return new ThemedIconDrawable.ThemeData(context.getResources(), componentName.getPackageName(), resId);
+        // Evergreen: a plain loop; this runs on every icon render, themed or not.
+        String packageName = componentName.getPackageName();
+        for (int i = dynamicCalendars.size() - 1; i >= 0; i--) {
+            if (dynamicCalendars.get(i).getPackageName().equalsIgnoreCase(packageName)) {
+                final int resId = getDynamicCalendarResource(context);
+                return new ThemedIconDrawable.ThemeData(context.getResources(), packageName, resId);
+            }
         }
         return null;
     }
@@ -330,7 +334,12 @@ public class IconProvider {
             return ID_NULL;
         }
         try {
-            return resources.obtainTypedArray(arrayId).getResourceId(getDay(), ID_NULL);
+            TypedArray array = resources.obtainTypedArray(arrayId);
+            try {
+                return array.getResourceId(getDay(), ID_NULL);
+            } finally {
+                array.recycle();
+            }
         } catch (Resources.NotFoundException e) {
             if (DEBUG) {
                 Log.d(TAG, "package defines '" + key + "' but corresponding array not found");

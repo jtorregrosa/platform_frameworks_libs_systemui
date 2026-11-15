@@ -173,7 +173,7 @@ public class BitmapInfo {
 
     protected void applyFlags(Context context, FastBitmapDrawable drawable,
             @DrawableCreationFlags int creationFlags) {
-        drawable.mDisabledAlpha = GraphicsUtils.getFloat(context, R.attr.disabledIconAlpha, 1f);
+        drawable.mDisabledAlpha = GraphicsUtils.getDisabledIconAlpha(context);
         drawable.mCreationFlags = creationFlags;
         if ((creationFlags & FLAG_NO_BADGE) == 0) {
             Drawable badge = getBadgeDrawable(context, (creationFlags & FLAG_THEMED) != 0,

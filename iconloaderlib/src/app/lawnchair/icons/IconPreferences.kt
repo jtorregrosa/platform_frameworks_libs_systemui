@@ -1,6 +1,7 @@
 package app.lawnchair.icons
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -9,7 +10,15 @@ import android.graphics.drawable.Drawable
 import androidx.core.graphics.ColorUtils
 import androidx.palette.graphics.Palette
 
-val Context.prefs get() = applicationContext.getSharedPreferences("com.android.launcher3.prefs", Context.MODE_PRIVATE)!!
+// Evergreen: cache the instance. These prefs are read on every icon render and themed bind;
+// getSharedPreferences takes two locks and two map lookups per call.
+@Volatile
+private var cachedPrefs: SharedPreferences? = null
+
+val Context.prefs: SharedPreferences
+    get() = cachedPrefs ?: applicationContext
+        .getSharedPreferences("com.android.launcher3.prefs", Context.MODE_PRIVATE)!!
+        .also { cachedPrefs = it }
 
 fun shouldWrapAdaptive(context: Context) = context.prefs.getBoolean("prefs_wrapAdaptive", false)
 fun Context.shouldTransparentBGIcons(): Boolean = prefs.getBoolean("prefs_transparentIconBackground", false)
