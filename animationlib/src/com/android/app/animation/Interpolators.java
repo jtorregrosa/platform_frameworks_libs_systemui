@@ -160,12 +160,15 @@ public class Interpolators {
     public static final Interpolator FAST_OUT_SLOW_IN_REVERSE =
             new PathInterpolator(0.8f, 0f, 0.6f, 1f);
     public static final Interpolator SLOW_OUT_LINEAR_IN = new PathInterpolator(0.8f, 0f, 1f, 1f);
-    public static final Interpolator AGGRESSIVE_EASE = new PathInterpolator(0.2f, 0f, 0f, 1f);
+    // Evergreen: same curves as STANDARD, LEGACY_DECELERATE, LEGACY_ACCELERATE and LEGACY, so
+    // share those instances instead of building duplicates in <clinit>. PathInterpolator is
+    // immutable and no caller compares interpolators by identity.
+    public static final Interpolator AGGRESSIVE_EASE = STANDARD;
     public static final Interpolator AGGRESSIVE_EASE_IN_OUT = new PathInterpolator(0.6f,0, 0.4f, 1);
 
-    public static final Interpolator DECELERATED_EASE = new PathInterpolator(0, 0, .2f, 1f);
-    public static final Interpolator ACCELERATED_EASE = new PathInterpolator(0.4f, 0, 1f, 1f);
-    public static final Interpolator ALPHA_IN = new PathInterpolator(0.4f, 0f, 1f, 1f);
+    public static final Interpolator DECELERATED_EASE = LEGACY_DECELERATE;
+    public static final Interpolator ACCELERATED_EASE = LEGACY_ACCELERATE;
+    public static final Interpolator ALPHA_IN = LEGACY_ACCELERATE;
     public static final Interpolator ALPHA_OUT = new PathInterpolator(0f, 0f, 0.8f, 1f);
     public static final Interpolator ACCELERATE = new AccelerateInterpolator();
     public static final Interpolator ACCELERATE_0_5 = new AccelerateInterpolator(0.5f);
@@ -189,8 +192,7 @@ public class Interpolators {
     /**
      * For state transitions on the control panel that lives in GlobalActions.
      */
-    public static final Interpolator CONTROL_STATE = new PathInterpolator(0.4f, 0f, 0.2f,
-            1.0f);
+    public static final Interpolator CONTROL_STATE = LEGACY;
 
     /**
      * Interpolator to be used when animating a move based on a click. Pair with enough duration.
